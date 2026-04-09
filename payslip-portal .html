@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>web給与明細ポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6fb; --white: #fff; --border: #e2e8f0;
+    --accent: #4f7ef8; --accent-light: #eef2ff; --accent-dark: #3b67e0;
+    --green: #22c55e; --green-light: #f0fdf4;
+    --red: #f43f5e; --red-light: #fff1f2; --orange: #f97316;
+    --text: #1e293b; --text2: #64748b; --text3: #94a3b8;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 20px 48px rgba(0,0,0,0.10);
+    --radius: 14px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .center-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 10% 20%, rgba(79,126,248,0.13) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(34,197,94,0.09) 0%, transparent 50%), #f4f6fb;
+    padding: 20px;
+  }
+
+  .card { background: var(--white); border-radius: 20px; padding: 36px 32px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); width: 100%; }
+
+  .brand-block { text-align: center; margin-bottom: 26px; }
+  .brand-icon { width: 62px; height: 62px; background: linear-gradient(135deg, var(--accent), #7aabff); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 12px; box-shadow: 0 8px 24px rgba(79,126,248,0.30); }
+  .brand-name { font-size: 20px; font-weight: 900; color: var(--text); letter-spacing: -0.5px; }
+  .brand-name span { color: var(--accent); }
+  .brand-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+  .form-input { width: 100%; padding: 11px 14px; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; font-family: 'Noto Sans JP', sans-serif; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,126,248,0.12); background: white; }
+  .form-input::placeholder { color: var(--text3); }
+
+  .btn { padding: 11px 18px; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; font-family: 'Noto Sans JP', sans-serif; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-block { width: 100%; justify-content: center; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #7aabff); color: white; box-shadow: 0 4px 14px rgba(79,126,248,0.32); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,126,248,0.38); }
+  .btn-success { background: linear-gradient(135deg, var(--green), #16a34a); color: white; box-shadow: 0 4px 14px rgba(34,197,94,0.28); }
+  .btn-success:hover { transform: translateY(-1px); }
+  .btn-outline { background: white; border: 1.5px solid var(--border); color: var(--text2); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  .error-box { background: var(--red-light); color: var(--red); font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-top: 8px; display: none; border: 1px solid rgba(244,63,94,0.2); }
+
+  /* GAS URL設定モーダル */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9000; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.active { display: flex; }
+  .modal-box { background: white; border-radius: 16px; padding: 28px; max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); }
+  .modal-title { font-size: 16px; font-weight: 900; margin-bottom: 8px; }
+  .modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+  .modal-input { width: 100%; padding: 10px 14px; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; font-family: 'DM Mono', monospace; outline: none; margin-bottom: 14px; }
+  .modal-input:focus { border-color: var(--accent); }
+
+  /* NAV */
+  .nav { background: white; border-bottom: 1px solid var(--border); padding: 0 20px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-sm); }
+  .nav-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 58px; gap: 16px; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .nav-brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent), #7aabff); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 8px rgba(79,126,248,0.25); }
+  .nav-brand-name { font-size: 15px; font-weight: 900; color: var(--text); letter-spacing: -0.3px; }
+  .nav-brand-name span { color: var(--accent); }
+  .nav-right { display: flex; align-items: center; gap: 10px; }
+  .nav-user-name { font-size: 13px; font-weight: 700; color: var(--text); display: block; }
+  .nav-user-dept { font-size: 11px; color: var(--text3); display: block; }
+  .nav-avatar { width: 34px; height: 34px; background: linear-gradient(135deg, var(--green), #16a34a); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; box-shadow: 0 2px 8px rgba(34,197,94,0.25); flex-shrink: 0; }
+  .nav-avatar.admin-avatar { background: linear-gradient(135deg, #f97316, #ea580c); }
+
+  /* MAIN */
+  .main { max-width: 960px; margin: 0 auto; padding: 28px 20px; animation: fadeUp 0.35s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 22px; background: white; padding: 5px; border-radius: 10px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); width: fit-content; }
+  .tab { padding: 8px 18px; background: none; border: none; color: var(--text2); font-size: 13px; font-family: 'Noto Sans JP', sans-serif; cursor: pointer; border-radius: 7px; transition: all 0.2s; font-weight: 500; white-space: nowrap; }
+  .tab.active { background: var(--accent); color: white; box-shadow: 0 2px 8px rgba(79,126,248,0.30); font-weight: 700; }
+  .tab.active.admin-tab { background: var(--orange); box-shadow: 0 2px 8px rgba(249,115,22,0.30); }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .page-title { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+  .summary-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
+  .summary-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .summary-card.green::before { background: var(--green); }
+  .summary-card.red::before   { background: var(--red); }
+  .summary-card.blue::before  { background: var(--accent); }
+  .summary-card-label { font-size: 11px; font-weight: 700; color: var(--text3); letter-spacing: 0.5px; margin-bottom: 8px; }
+  .summary-card-value { font-size: 24px; font-weight: 900; font-family: 'DM Mono', monospace; letter-spacing: -1px; }
+  .summary-card-value.green { color: var(--green); }
+  .summary-card-value.red   { color: var(--red); }
+  .summary-card-value.blue  { color: var(--accent); }
+  .summary-card-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+  .detail-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+  .detail-card-header { padding: 12px 20px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text2); letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dot.green { background: var(--green); }
+  .dot.red   { background: var(--red); }
+  .dot.blue  { background: var(--accent); }
+  .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row-name { color: var(--text2); }
+  .detail-row-value { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text); }
+  .detail-row.total { background: #f8faff; padding: 13px 20px; font-weight: 700; }
+  .detail-row.total .detail-row-name { color: var(--text); font-size: 14px; }
+  .detail-row.total .detail-row-value { color: var(--accent); font-size: 15px; font-weight: 900; }
+  .detail-row.net-total { background: linear-gradient(135deg, #eef2ff, #f0f9ff); padding: 18px 20px; }
+  .detail-row.net-total .detail-row-name { color: var(--text); font-size: 15px; font-weight: 700; }
+  .detail-row.net-total .detail-row-value { color: var(--accent); font-size: 22px; font-weight: 900; }
+
+  .history-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .history-table-header { display: grid; grid-template-columns: 1.2fr 1fr 1fr auto; padding: 10px 20px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text3); letter-spacing: 0.5px; }
+  .history-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr auto; padding: 13px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; align-items: center; transition: background 0.15s; cursor: pointer; }
+  .history-row:last-child { border-bottom: none; }
+  .history-row:hover { background: #f8faff; }
+  .history-row .mono { font-family: 'DM Mono', monospace; font-weight: 500; }
+  .history-row .green { color: var(--green); }
+  .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge.confirmed { background: var(--green-light); color: #16a34a; border: 1px solid rgba(34,197,94,0.2); }
+  .badge.pending   { background: #fff7ed; color: var(--orange); border: 1px solid rgba(249,115,22,0.2); }
+
+  /* ADMIN */
+  .admin-grid { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+  .admin-sidebar { background: white; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .admin-sidebar-header { padding: 14px 18px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text2); }
+  .emp-item { padding: 11px 18px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.15s; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+  .emp-item:last-child { border-bottom: none; }
+  .emp-item:hover { background: #f8faff; }
+  .emp-item.active { background: var(--accent-light); }
+  .emp-item-name { font-weight: 700; color: var(--text); }
+  .emp-item-dept { font-size: 11px; color: var(--text3); }
+  .emp-item-id   { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+
+  .admin-form-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .admin-form-header { padding: 14px 20px; background: linear-gradient(135deg, #fff7ed, #fef3c7); border-bottom: 1px solid #fde68a; font-size: 14px; font-weight: 700; color: #92400e; }
+  .admin-form-body { padding: 20px; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-section-label { font-size: 11px; font-weight: 700; color: var(--text3); letter-spacing: 1px; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .input-yen { position: relative; }
+  .input-yen .form-input { padding-left: 28px; }
+  .input-yen::before { content: '¥'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 13px; pointer-events: none; }
+
+  .success-msg { background: var(--green-light); color: #16a34a; font-size: 13px; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(34,197,94,0.3); display: none; margin-top: 12px; font-weight: 600; }
+
+  .loading { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 13px; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: white; border: 1px solid var(--green); border-left: 4px solid var(--green); border-radius: 10px; padding: 12px 20px; font-size: 13px; font-weight: 600; color: #16a34a; display: none; z-index: 9999; box-shadow: var(--shadow); animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* GAS未設定バナー */
+  .setup-banner { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #92400e; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+  @media (max-width: 700px) { .admin-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .summary-grid { grid-template-columns: 1fr; }
+    .nav-user-name, .nav-user-dept { display: none; }
+    .history-table-header { grid-template-columns: 1fr 1fr auto; }
+    .history-row { grid-template-columns: 1fr 1fr auto; }
+    .history-table-header .hide-sm, .history-row .hide-sm { display: none; }
+    .page-header { flex-direction: column; }
+    .card { padding: 24px 20px; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- GAS URL設定モーダル -->
+<div class="modal-overlay" id="gasModal">
+  <div class="modal-box">
+    <div class="modal-title">⚙️ GAS URLを設定</div>
+    <div class="modal-sub">Google Apps ScriptのウェブアプリURLを貼り付けてください。<br>一度設定すれば次回から自動で読み込まれます。</div>
+    <input class="modal-input" type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="saveGasUrl()">保存して続ける</button>
+      <button class="btn btn-outline btn-sm" onclick="closeGasModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- ログイン画面 -->
+<div id="loginScreen" class="screen active center-screen">
+  <div style="max-width:420px;width:100%">
+    <div class="brand-block">
+      <div class="brand-icon">💴</div>
+      <div class="brand-name">web給与明細<span>ポータル</span></div>
+      <div class="brand-sub">社員専用システム</div>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">社員ID</label>
+        <input class="form-input" type="text" id="empId" placeholder="例: EMP001" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <input class="form-input" type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="error-box" id="loginError">IDまたはパスワードが正しくありません</div>
+      <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="doLogin()">ログイン →</button>
+      <div style="margin-top:14px;text-align:center;display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" onclick="showAdminLogin()">⚙️ 管理者ログイン</button>
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;color:var(--accent)" onclick="openGasModal()">🔗 GAS URLを設定する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 管理者ログイン画面 -->
+<div id="adminLoginScreen" class="screen center-screen">
+  <div style="max-width:380px;width:100%">
+    <div class="brand-block">
+      <div class="brand-icon" style="background:linear-gradient(135deg,#f97316,#ea580c)">⚙️</div>
+      <div class="brand-name"><span style="color:var(--orange)">管理者</span>ログイン</div>
+      <div class="brand-sub">給与データ管理画面</div>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">管理者パスワード</label>
+        <input class="form-input" type="password" id="adminPw" placeholder="••••••••">
+      </div>
+      <div class="error-box" id="adminLoginError">パスワードが正しくありません</div>
+      <button class="btn btn-primary btn-block" style="background:linear-gradient(135deg,#f97316,#ea580c);box-shadow:0 4px 14px rgba(249,115,22,0.32);margin-top:8px" onclick="doAdminLogin()">管理者として入る →</button>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" onclick="showScreen('loginScreen')">← 社員ログインへ戻る</button>
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;color:var(--accent)" onclick="openGasModal()">🔗 GAS URLを設定する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 社員アプリ -->
+<div id="app" class="screen">
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <div class="nav-brand-icon">💴</div>
+        <div class="nav-brand-name">web給与明細<span>ポータル</span></div>
+      </div>
+      <div class="nav-right">
+        <div style="text-align:right">
+          <span class="nav-user-name" id="navUserName"></span>
+          <span class="nav-user-dept" id="navUserDept"></span>
+        </div>
+        <div class="nav-avatar" id="navAvatar"></div>
+        <button class="btn btn-outline btn-sm" onclick="doLogout()">ログアウト</button>
+      </div>
+    </div>
+  </nav>
+  <main class="main">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('current', this)">📄 最新の給与明細</button>
+      <button class="tab" onclick="switchTab('history', this)">🗂 明細履歴</button>
+    </div>
+
+    <div class="section active" id="tab-current">
+      <div id="currentLoading" class="loading"><div class="spinner"></div>データを読み込み中...</div>
+      <div id="currentContent" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title">給与明細</div>
+            <div class="page-sub" id="currentPeriodLabel"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="downloadPDF()">📄 PDF出力</button>
+        </div>
+        <div class="summary-grid">
+          <div class="summary-card green"><div class="summary-card-label">支給合計</div><div class="summary-card-value green" id="totalIncome">—</div><div class="summary-card-sub">総支給額</div></div>
+          <div class="summary-card red"><div class="summary-card-label">控除合計</div><div class="summary-card-value red" id="totalDeduct">—</div><div class="summary-card-sub">各種控除</div></div>
+          <div class="summary-card blue"><div class="summary-card-label">差引支給額</div><div class="summary-card-value blue" id="netPay">—</div><div class="summary-card-sub">手取り額</div></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-header"><div class="dot green"></div>支給明細</div>
+          <div id="incomeRows"></div>
+          <div class="detail-row total"><span class="detail-row-name">支給合計</span><span class="detail-row-value" id="totalIncomeRow">¥0</span></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-header"><div class="dot red"></div>控除明細</div>
+          <div id="deductRows"></div>
+          <div class="detail-row total"><span class="detail-row-name">控除合計</span><span class="detail-row-value" id="totalDeductRow">¥0</span></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-row net-total"><span class="detail-row-name">差引支給額（手取り）</span><span class="detail-row-value" id="netPayRow">¥0</span></div>
+        </div>
+      </div>
+      <div id="currentEmpty" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">給与明細データがまだありません</div>
+    </div>
+
+    <div class="section" id="tab-history">
+      <div class="page-header"><div><div class="page-title">明細履歴</div><div class="page-sub">過去の給与明細一覧</div></div></div>
+      <div id="historyLoading" class="loading"><div class="spinner"></div>読み込み中...</div>
+      <div id="historyContent" style="display:none">
+        <div class="history-card">
+          <div class="history-table-header">
+            <span>支給月</span><span>手取り額</span>
+            <span class="hide-sm">ステータス</span>
+            <span>操作</span>
+          </div>
+          <div id="historyRows"></div>
+        </div>
+      </div>
+      <div id="historyEmpty" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">明細データがありません</div>
+    </div>
+  </main>
+</div>
+
+<!-- 管理者アプリ -->
+<div id="adminApp" class="screen">
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <div class="nav-brand-icon" style="background:linear-gradient(135deg,#f97316,#ea580c)">⚙️</div>
+        <div class="nav-brand-name"><span style="color:var(--orange)">管理者</span>ダッシュボード</div>
+      </div>
+      <div class="nav-right">
+        <div class="nav-avatar admin-avatar">管</div>
+        <button class="btn btn-outline btn-sm" onclick="doLogout()">ログアウト</button>
+      </div>
+    </div>
+  </nav>
+  <main class="main">
+    <div class="tabs">
+      <button class="tab active admin-tab" onclick="switchAdminTab('payslip', this)">💰 給与データ入力</button>
+      <button class="tab" onclick="switchAdminTab('employee', this)">👤 社員管理</button>
+    </div>
+
+    <div class="section active" id="admin-tab-payslip">
+      <div class="page-header">
+        <div><div class="page-title">給与データ入力</div><div class="page-sub">社員を選んで給与明細を登録・更新します</div></div>
+      </div>
+      <div class="admin-grid">
+        <div>
+          <div class="admin-sidebar">
+            <div class="admin-sidebar-header">👥 社員一覧</div>
+            <div id="empList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+          </div>
+        </div>
+        <div class="admin-form-card">
+          <div class="admin-form-header" id="adminFormTitle">💴 社員を選択してください</div>
+          <div class="admin-form-body">
+            <div id="adminFormInner" style="color:var(--text3);font-size:13px;text-align:center;padding:30px 0">
+              左の一覧から社員を選ぶと入力フォームが表示されます
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="admin-tab-employee">
+      <div class="page-header">
+        <div><div class="page-title">社員管理</div><div class="page-sub">社員の登録・パスワード管理</div></div>
+        <button class="btn btn-success btn-sm" onclick="showAddEmployee()">＋ 社員追加</button>
+      </div>
+      <div id="empManageArea"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// GAS URLの管理
+function getGasUrl() { return localStorage.getItem('gasUrl') || ''; }
+function setGasUrl(url) { localStorage.setItem('gasUrl', url); }
+
+function openGasModal() {
+  document.getElementById('gasUrlInput').value = getGasUrl();
+  document.getElementById('gasModal').classList.add('active');
+}
+function closeGasModal() { document.getElementById('gasModal').classList.remove('active'); }
+function saveGasUrl() {
+  const url = document.getElementById('gasUrlInput').value.trim();
+  if (!url || !url.startsWith('https://script.google.com')) {
+    alert('正しいGAS URLを入力してください\n（https://script.google.com/... で始まるURL）');
+    return;
+  }
+  setGasUrl(url);
+  closeGasModal();
+  showToast('GAS URLを保存しました ✓');
+}
+
+// API
+async function apiGet(params) {
+  const url = getGasUrl();
+  if (!url) { openGasModal(); throw new Error('GAS URL未設定'); }
+  const q = new URLSearchParams(params).toString();
+  const res = await fetch(`${url}?${q}`);
+  return res.json();
+}
+async function apiPost(body) {
+  const url = getGasUrl();
+  if (!url) { openGasModal(); throw new Error('GAS URL未設定'); }
+  const res = await fetch(url, { method: 'POST', body: JSON.stringify(body) });
+  return res.json();
+}
+
+// 画面切替
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+let currentUser = null, allPayslips = [], selectedIdx = 0;
+let adminPwCache = '', adminEmployees = [], selectedEmpForPayslip = null;
+
+// 社員ログイン
+async function doLogin() {
+  const id = document.getElementById('empId').value.trim();
+  const pw = document.getElementById('password').value;
+  if (!id || !pw) return;
+  if (!getGasUrl()) { openGasModal(); return; }
+  try {
+    const data = await apiGet({ action: 'login', empId: id, password: pw });
+    if (data.success) {
+      currentUser = data.employee;
+      document.getElementById('navUserName').textContent = currentUser.name;
+      document.getElementById('navUserDept').textContent = currentUser.dept;
+      document.getElementById('navAvatar').textContent   = currentUser.initial || currentUser.name.charAt(0);
+      showScreen('app');
+      loadPayslips();
+    } else {
+      showError('loginError', data.error || 'ログインに失敗しました');
+    }
+  } catch(e) { showError('loginError', 'サーバーに接続できません'); }
+}
+document.getElementById('password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// 管理者ログイン
+function showAdminLogin() { showScreen('adminLoginScreen'); }
+async function doAdminLogin() {
+  const pw = document.getElementById('adminPw').value;
+  if (!pw) return;
+  if (!getGasUrl()) { openGasModal(); return; }
+  try {
+    const data = await apiGet({ action: 'adminLogin', password: pw });
+    if (data.success) {
+      adminPwCache = pw;
+      showScreen('adminApp');
+      loadAdminEmployees();
+    } else {
+      showError('adminLoginError', data.error || 'パスワードが違います');
+    }
+  } catch(e) { showError('adminLoginError', 'サーバーに接続できません'); }
+}
+document.getElementById('adminPw').addEventListener('keydown', e => { if(e.key==='Enter') doAdminLogin(); });
+
+// ログアウト
+function doLogout() {
+  currentUser = null; adminPwCache = '';
+  document.getElementById('empId').value = '';
+  document.getElementById('password').value = '';
+  document.getElementById('adminPw').value = '';
+  showScreen('loginScreen');
+}
+
+// 給与データ
+async function loadPayslips() {
+  ['currentLoading','historyLoading'].forEach(id => document.getElementById(id).style.display = 'block');
+  ['currentContent','currentEmpty','historyContent','historyEmpty'].forEach(id => document.getElementById(id).style.display = 'none');
+  try {
+    const data = await apiGet({ action: 'getPayslips', empId: currentUser.empId });
+    if (data.success) {
+      allPayslips = data.payslips;
+      ['currentLoading','historyLoading'].forEach(id => document.getElementById(id).style.display = 'none');
+      if (allPayslips.length > 0) { renderPayslip(0); renderHistory(); }
+      else { ['currentEmpty','historyEmpty'].forEach(id => document.getElementById(id).style.display = 'block'); }
+    }
+  } catch(e) {
+    ['currentLoading','historyLoading'].forEach(id => document.getElementById(id).style.display = 'none');
+    ['currentEmpty','historyEmpty'].forEach(id => document.getElementById(id).style.display = 'block');
+  }
+}
+
+function calc(p) {
+  const totalIncome = p.basicSalary + p.overtime + p.commute + p.housing + p.otherIncome;
+  const totalDeduct = p.healthIns + p.nursingIns + p.pension + p.employIns + p.incomeTax + p.residTax + p.otherDeduct;
+  return { totalIncome, totalDeduct, net: totalIncome - totalDeduct };
+}
+function fmt(n) { return '¥' + Number(n).toLocaleString('ja-JP'); }
+function fmtYM(ym) { const [y,m] = ym.split('-'); return `${y}年${parseInt(m)}月分`; }
+
+function renderPayslip(idx) {
+  selectedIdx = idx;
+  const p = allPayslips[idx], c = calc(p);
+  document.getElementById('currentPeriodLabel').textContent = fmtYM(p.yearMonth);
+  document.getElementById('totalIncome').textContent    = fmt(c.totalIncome);
+  document.getElementById('totalDeduct').textContent    = fmt(c.totalDeduct);
+  document.getElementById('netPay').textContent         = fmt(c.net);
+  document.getElementById('totalIncomeRow').textContent = fmt(c.totalIncome);
+  document.getElementById('totalDeductRow').textContent = fmt(c.totalDeduct);
+  document.getElementById('netPayRow').textContent      = fmt(c.net);
+
+  const income = [{name:'基本給',value:p.basicSalary},{name:'残業手当',value:p.overtime},{name:'通勤手当',value:p.commute},{name:'住宅手当',value:p.housing}];
+  if(p.otherIncome) income.push({name:'その他支給',value:p.otherIncome});
+  const deduct = [{name:'健康保険料',value:p.healthIns},{name:'介護保険料',value:p.nursingIns},{name:'厚生年金保険料',value:p.pension},{name:'雇用保険料',value:p.employIns},{name:'所得税',value:p.incomeTax},{name:'住民税',value:p.residTax}];
+  if(p.otherDeduct) deduct.push({name:'その他控除',value:p.otherDeduct});
+
+  document.getElementById('incomeRows').innerHTML = income.map(r => `<div class="detail-row"><span class="detail-row-name">${r.name}</span><span class="detail-row-value">${fmt(r.value)}</span></div>`).join('');
+  document.getElementById('deductRows').innerHTML = deduct.map(r => `<div class="detail-row"><span class="detail-row-name">${r.name}</span><span class="detail-row-value">${fmt(r.value)}</span></div>`).join('');
+  document.getElementById('currentContent').style.display = 'block';
+}
+
+function renderHistory() {
+  document.getElementById('historyRows').innerHTML = allPayslips.map((p,i) => {
+    const c = calc(p);
+    return `<div class="history-row" onclick="viewFromHistory(${i})">
+      <span>${fmtYM(p.yearMonth)}</span>
+      <span class="mono green">${fmt(c.net)}</span>
+      <span class="hide-sm"><span class="badge ${p.confirmed?'confirmed':'pending'}">${p.confirmed?'確定済':'処理中'}</span></span>
+      <button class="btn btn-outline btn-sm" style="font-size:11px" onclick="event.stopPropagation();viewFromHistory(${i})">表示</button>
+    </div>`;
+  }).join('');
+  document.getElementById('historyContent').style.display = 'block';
+}
+
+function viewFromHistory(idx) { renderPayslip(idx); switchTab('current', document.querySelectorAll('#app .tab')[0]); }
+
+function switchTab(id, btn) {
+  document.querySelectorAll('#app .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#app .section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+function switchAdminTab(id, btn) {
+  document.querySelectorAll('#adminApp .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#adminApp .section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('admin-tab-'+id).classList.add('active');
+  if(id==='employee') renderEmpManage();
+}
+
+// 管理者：社員リスト
+async function loadAdminEmployees() {
+  try {
+    const data = await apiGet({ action: 'getEmployees', adminPw: adminPwCache });
+    if(data.success) {
+      adminEmployees = data.employees;
+      document.getElementById('empList').innerHTML = adminEmployees.map(e =>
+        `<div class="emp-item" id="emp-${e.empId}" onclick="selectEmpForPayslip('${e.empId}')">
+          <div><div class="emp-item-name">${e.name}</div><div class="emp-item-dept">${e.dept}</div></div>
+          <div class="emp-item-id">${e.empId}</div>
+        </div>`
+      ).join('') || '<div style="padding:16px;font-size:13px;color:var(--text3)">社員が登録されていません</div>';
+    }
+  } catch(e) {}
+}
+
+// 管理者：給与入力
+function selectEmpForPayslip(empId) {
+  selectedEmpForPayslip = adminEmployees.find(e => e.empId === empId);
+  document.querySelectorAll('.emp-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('emp-'+empId);
+  if(el) el.classList.add('active');
+  document.getElementById('adminFormTitle').textContent = `💴 ${selectedEmpForPayslip.name}（${empId}）の給与データ`;
+  const now = new Date();
+  const defaultYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('adminFormInner').innerHTML = `
+    <div class="form-group"><label class="form-label">支給年月</label><input class="form-input" type="month" id="f_yearMonth" value="${defaultYM}" onchange="loadExistingPayslip()"></div>
+    <div class="form-section-label">▸ 支給項目</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">基本給</label><div class="input-yen"><input class="form-input" type="number" id="f_basicSalary" value="0"></div></div>
+      <div class="form-group"><label class="form-label">残業手当</label><div class="input-yen"><input class="form-input" type="number" id="f_overtime" value="0"></div></div>
+      <div class="form-group"><label class="form-label">通勤手当</label><div class="input-yen"><input class="form-input" type="number" id="f_commute" value="0"></div></div>
+      <div class="form-group"><label class="form-label">住宅手当</label><div class="input-yen"><input class="form-input" type="number" id="f_housing" value="0"></div></div>
+      <div class="form-group"><label class="form-label">その他支給</label><div class="input-yen"><input class="form-input" type="number" id="f_otherIncome" value="0"></div></div>
+    </div>
+    <div class="form-section-label">▸ 控除項目</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">健康保険料</label><div class="input-yen"><input class="form-input" type="number" id="f_healthIns" value="0"></div></div>
+      <div class="form-group"><label class="form-label">介護保険料</label><div class="input-yen"><input class="form-input" type="number" id="f_nursingIns" value="0"></div></div>
+      <div class="form-group"><label class="form-label">厚生年金保険料</label><div class="input-yen"><input class="form-input" type="number" id="f_pension" value="0"></div></div>
+      <div class="form-group"><label class="form-label">雇用保険料</label><div class="input-yen"><input class="form-input" type="number" id="f_employIns" value="0"></div></div>
+      <div class="form-group"><label class="form-label">所得税</label><div class="input-yen"><input class="form-input" type="number" id="f_incomeTax" value="0"></div></div>
+      <div class="form-group"><label class="form-label">住民税</label><div class="input-yen"><input class="form-input" type="number" id="f_residTax" value="0"></div></div>
+      <div class="form-group"><label class="form-label">その他控除</label><div class="input-yen"><input class="form-input" type="number" id="f_otherDeduct" value="0"></div></div>
+    </div>
+    <div class="form-section-label">▸ その他</div>
+    <div class="form-group"><label class="form-label">メモ</label><input class="form-input" type="text" id="f_memo" placeholder="任意メモ（社員には表示されません）"></div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px">
+      <input type="checkbox" id="f_confirmed" style="width:16px;height:16px;accent-color:var(--green)">
+      <label for="f_confirmed" class="form-label" style="margin:0">確定済みにする</label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-success" onclick="savePayslip()">💾 保存する</button>
+      <button class="btn btn-outline btn-sm" onclick="clearPayslipForm()">リセット</button>
+    </div>
+    <div class="success-msg" id="saveSuccess">✅ 保存しました！</div>`;
+  loadExistingPayslip();
+}
+
+async function loadExistingPayslip() {
+  if(!selectedEmpForPayslip) return;
+  const ym = document.getElementById('f_yearMonth').value;
+  try {
+    const data = await apiGet({ action:'getPayslipData', adminPw:adminPwCache, empId:selectedEmpForPayslip.empId, yearMonth:ym });
+    if(data.success && data.found) {
+      const p = data.payslip;
+      ['basicSalary','overtime','commute','housing','otherIncome','healthIns','nursingIns','pension','employIns','incomeTax','residTax','otherDeduct','memo'].forEach(f => {
+        const el = document.getElementById('f_'+f); if(el) el.value = p[f]||0;
+      });
+      document.getElementById('f_confirmed').checked = p.confirmed===true||p.confirmed==='TRUE';
+    } else { clearPayslipForm(); }
+  } catch(e) {}
+}
+
+function clearPayslipForm() {
+  ['basicSalary','overtime','commute','housing','otherIncome','healthIns','nursingIns','pension','employIns','incomeTax','residTax','otherDeduct'].forEach(f => { const el=document.getElementById('f_'+f); if(el) el.value=0; });
+  const m=document.getElementById('f_memo'); if(m) m.value='';
+  const c=document.getElementById('f_confirmed'); if(c) c.checked=false;
+}
+
+async function savePayslip() {
+  if(!selectedEmpForPayslip) return;
+  const payslip = {
+    empId: selectedEmpForPayslip.empId,
+    yearMonth: document.getElementById('f_yearMonth').value,
+    basicSalary:  Number(document.getElementById('f_basicSalary').value)||0,
+    overtime:     Number(document.getElementById('f_overtime').value)||0,
+    commute:      Number(document.getElementById('f_commute').value)||0,
+    housing:      Number(document.getElementById('f_housing').value)||0,
+    otherIncome:  Number(document.getElementById('f_otherIncome').value)||0,
+    healthIns:    Number(document.getElementById('f_healthIns').value)||0,
+    nursingIns:   Number(document.getElementById('f_nursingIns').value)||0,
+    pension:      Number(document.getElementById('f_pension').value)||0,
+    employIns:    Number(document.getElementById('f_employIns').value)||0,
+    incomeTax:    Number(document.getElementById('f_incomeTax').value)||0,
+    residTax:     Number(document.getElementById('f_residTax').value)||0,
+    otherDeduct:  Number(document.getElementById('f_otherDeduct').value)||0,
+    memo:         document.getElementById('f_memo').value||'',
+    confirmed:    document.getElementById('f_confirmed').checked,
+  };
+  try {
+    const data = await apiPost({ action:'savePayslip', adminPw:adminPwCache, payslip });
+    if(data.success) {
+      document.getElementById('saveSuccess').style.display='block';
+      showToast('給与データを保存しました ✓');
+      setTimeout(()=>document.getElementById('saveSuccess').style.display='none',3000);
+    } else { showToast('保存に失敗しました: '+data.error); }
+  } catch(e) { showToast('通信エラーが発生しました'); }
+}
+
+// 管理者：社員管理
+function renderEmpManage() {
+  if(!adminEmployees.length) { loadAdminEmployees().then(()=>renderEmpManage()); return; }
+  document.getElementById('empManageArea').innerHTML = `
+    <div class="history-card">
+      <div class="history-table-header" style="grid-template-columns:1fr 1fr 1fr auto">
+        <span>社員ID</span><span>氏名</span><span>所属部署</span><span>操作</span>
+      </div>
+      ${adminEmployees.map(e => `
+        <div class="history-row" style="grid-template-columns:1fr 1fr 1fr auto">
+          <span class="mono">${e.empId}</span>
+          <span style="font-weight:700">${e.name}</span>
+          <span style="color:var(--text2)">${e.dept}</span>
+          <button class="btn btn-outline btn-sm" onclick="showEditEmployee('${e.empId}')">編集</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showAddEmployee() { showEditEmployee(null); }
+function showEditEmployee(empId) {
+  const emp = empId ? adminEmployees.find(e=>e.empId===empId) : null;
+  document.getElementById('empManageArea').innerHTML = `
+    <div class="admin-form-card" style="max-width:500px">
+      <div class="admin-form-header">${emp?'✏️ 社員情報を編集':'➕ 社員を追加'}</div>
+      <div class="admin-form-body">
+        <div class="form-group"><label class="form-label">社員ID</label><input class="form-input" type="text" id="emp_id" value="${emp?emp.empId:''}" ${emp?'readonly style="opacity:0.6"':''}></div>
+        <div class="form-group"><label class="form-label">氏名</label><input class="form-input" type="text" id="emp_name" value="${emp?emp.name:''}"></div>
+        <div class="form-group"><label class="form-label">パスワード</label><input class="form-input" type="text" id="emp_pw" placeholder="${emp?'変更する場合のみ入力':'初期パスワード'}"></div>
+        <div class="form-group"><label class="form-label">所属部署</label><input class="form-input" type="text" id="emp_dept" value="${emp?emp.dept:''}"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-success" onclick="saveEmployee()">💾 保存</button>
+          <button class="btn btn-outline btn-sm" onclick="renderEmpManage()">キャンセル</button>
+        </div>
+        <div class="success-msg" id="empSaveSuccess">✅ 保存しました！</div>
+      </div>
+    </div>`;
+}
+
+async function saveEmployee() {
+  const employee = { empId:document.getElementById('emp_id').value.trim(), name:document.getElementById('emp_name').value.trim(), password:document.getElementById('emp_pw').value||'', dept:document.getElementById('emp_dept').value.trim() };
+  if(!employee.empId||!employee.name) { alert('社員IDと氏名は必須です'); return; }
+  try {
+    const data = await apiPost({ action:'saveEmployee', adminPw:adminPwCache, employee });
+    if(data.success) {
+      document.getElementById('empSaveSuccess').style.display='block';
+      showToast(data.message+' ✓');
+      await loadAdminEmployees();
+      setTimeout(()=>renderEmpManage(),1500);
+    } else { showToast('保存失敗: '+data.error); }
+  } catch(e) { showToast('通信エラー'); }
+}
+
+// PDF
+function downloadPDF() {
+  const {jsPDF}=window.jspdf, doc=new jsPDF({unit:'mm',format:'a4'});
+  const p=allPayslips[selectedIdx], c=calc(p), u=currentUser;
+  doc.setFillColor(255,255,255); doc.rect(0,0,210,297,'F');
+  doc.setFillColor(79,126,248); doc.rect(0,0,210,36,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(255,255,255);
+  doc.text('web\u7d66\u4e0e\u660e\u7d30\u30dd\u30fc\u30bf\u30eb',15,16);
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(200,215,255);
+  doc.text('\u793e\u54e1\u5c02\u7528\u30b7\u30b9\u30c6\u30e0',15,24);
+  doc.setFontSize(10); doc.setTextColor(255,255,255); doc.text(fmtYM(p.yearMonth),15,31);
+  doc.setFillColor(244,246,251); doc.roundedRect(12,42,186,14,2,2,'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139);
+  doc.text(`\u793e\u54e1ID: ${u.empId}   \u6c0f\u540d: ${u.name}   \u6240\u5c5e: ${u.dept}`,18,51);
+  let y=64;
+  function ds(title,dc,rows,tl,tv) {
+    doc.setFillColor(244,246,251); doc.roundedRect(12,y,186,8,1,1,'F');
+    doc.setFillColor(...dc); doc.circle(17,y+4,1.5,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,116,139); doc.text(title,21,y+5.5); y+=10;
+    rows.forEach(r=>{ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139); doc.text(r.name,20,y); doc.setTextColor(30,41,59); doc.text(fmt(r.value),192,y,{align:'right'}); doc.setDrawColor(241,245,249); doc.line(12,y+2.5,198,y+2.5); y+=8; });
+    doc.setFillColor(248,250,255); doc.rect(12,y,186,9,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,41,59); doc.text(tl,20,y+6); doc.setTextColor(79,126,248); doc.text(fmt(tv),192,y+6,{align:'right'}); y+=13;
+  }
+  const ir=[{name:'\u57fa\u672c\u7d66',value:p.basicSalary},{name:'\u6b8b\u696d\u624b\u5f53',value:p.overtime},{name:'\u901a\u52e4\u624b\u5f53',value:p.commute},{name:'\u4f4f\u5b85\u624b\u5f53',value:p.housing}];
+  if(p.otherIncome) ir.push({name:'\u305d\u306e\u4ed6\u652f\u7d66',value:p.otherIncome});
+  const dr=[{name:'\u5065\u5eb7\u4fdd\u967a\u6599',value:p.healthIns},{name:'\u4ecb\u8b77\u4fdd\u967a\u6599',value:p.nursingIns},{name:'\u5395\u751f\u5e74\u91d1\u4fdd\u967a\u6599',value:p.pension},{name:'\u96c7\u7528\u4fdd\u967a\u6599',value:p.employIns},{name:'\u6240\u5f97\u7a0e',value:p.incomeTax},{name:'\u4f4f\u6c11\u7a0e',value:p.residTax}];
+  if(p.otherDeduct) dr.push({name:'\u305d\u306e\u4ed6\u63a7\u9664',value:p.otherDeduct});
+  ds('\u652f\u7d66\u660e\u7d30',[34,197,94],ir,'\u652f\u7d66\u5408\u8a08',c.totalIncome); y+=3;
+  ds('\u63a7\u9664\u660e\u7d30',[244,63,94],dr,'\u63a7\u9664\u5408\u8a08',c.totalDeduct); y+=3;
+  doc.setFillColor(238,242,255); doc.roundedRect(12,y,186,16,3,3,'F'); doc.setDrawColor(79,126,248); doc.setLineWidth(0.5); doc.roundedRect(12,y,186,16,3,3,'S');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,41,59); doc.text('\u5dee\u5f15\u652f\u7d66\u984d\uff08\u624b\u53d6\u308a\uff09',20,y+10);
+  doc.setFontSize(13); doc.setTextColor(79,126,248); doc.text(fmt(c.net),192,y+10,{align:'right'}); y+=24;
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(148,163,184);
+  doc.text(`\u51fa\u529b\u65e5\u6642: ${new Date().toLocaleString('ja-JP')}   ${u.name} (${u.empId})`,15,y);
+  doc.save(`\u7d66\u4e0e\u660e\u7d30_${p.yearMonth}_${u.empId}.pdf`);
+  showToast('PDFを出力しました ✓');
+}
+
+function showError(id, msg) { const el=document.getElementById(id); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',4000); }
+function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
+</script>
+</body>
+</html>
